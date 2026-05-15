@@ -53,6 +53,8 @@ export function PaymentForm({ payment, companies, onSuccess, onCancel }: Payment
     pix_key: payment?.pix_key || '',
     barcode: payment?.barcode || '',
     cost_center: payment?.cost_center || '',
+    is_recurring: payment?.is_recurring ? 'true' : 'false',
+    recurrence_interval: payment?.recurrence_interval || '',
     value: payment ? payment.value.toFixed(2).replace('.', ',') : '',
     due_date: payment?.due_date || '',
     payment_date: payment?.payment_date || '',
@@ -97,6 +99,8 @@ export function PaymentForm({ payment, companies, onSuccess, onCancel }: Payment
       pix_key: form.pix_key || null,
       barcode: form.barcode || null,
       cost_center: form.cost_center || null,
+      is_recurring: form.is_recurring === 'true',
+      recurrence_interval: form.is_recurring === 'true' ? (form.recurrence_interval || null) : null,
       value,
       due_date: form.due_date,
       payment_date: form.payment_date || null,
@@ -114,6 +118,13 @@ export function PaymentForm({ payment, companies, onSuccess, onCancel }: Payment
         .update({ ...payload, updated_at: new Date().toISOString() })
         .eq('id', payment.id)
       if (updateErr) { setError(updateErr.message); setLoading(false); return }
+      // Audit log
+      await supabase.from('payment_audits').insert([{
+        payment_id: payment.id,
+        user_id: userId,
+        action: 'update',
+        changes: { note: 'Pagamento corrigido' }
+      }])
     } else {
       const { data: inserted, error: insertErr } = await supabase
         .from('payments')
@@ -226,6 +237,37 @@ export function PaymentForm({ payment, companies, onSuccess, onCancel }: Payment
           value={form.cost_center}
           onChange={e => handleChange('cost_center', e.target.value)}
         />
+
+        {/* Recorrência */}
+        <div className="sm:col-span-2 grid grid-cols-2 gap-4 p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+          <div className="col-span-2">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Pagamento Recorrente?</label>
+            <div className="flex gap-4 mt-2">
+              {[{ v: 'false', l: 'Não' }, { v: 'true', l: 'Sim' }].map(opt => (
+                <label key={opt.v} className="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" name="is_recurring" value={opt.v}
+                    checked={form.is_recurring === opt.v}
+                    onChange={e => handleChange('is_recurring', e.target.value)}
+                    className="accent-emerald-500" />
+                  <span className="text-sm text-slate-700 dark:text-slate-300">{opt.l}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          {form.is_recurring === 'true' && (
+            <Select
+              label="Periodicidade"
+              options={[
+                { value: 'weekly', label: 'Semanal' },
+                { value: 'monthly', label: 'Mensal' },
+                { value: 'yearly', label: 'Anual' },
+              ]}
+              placeholder="Selecione"
+              value={form.recurrence_interval}
+              onChange={e => handleChange('recurrence_interval', e.target.value)}
+            />
+          )}
+        </div>
 
         <Input
           label="Data de Vencimento *"
