@@ -17,6 +17,8 @@ export interface Payment {
   pix_key: string | null
   barcode: string | null
   cost_center: string | null
+  is_recurring: boolean
+  recurrence_interval: 'weekly' | 'monthly' | 'yearly' | null
   nf_url: string | null
   boleto_url: string | null
   receipt_url: string | null
@@ -49,4 +51,13 @@ export interface ExportColumn {
   description: string
   due_date: string
   status: string
+}
+
+export interface PaymentAudit {
+  id: string
+  payment_id: string
+  user_id: string
+  action: string
+  changes: Record<string, { from: unknown; to: unknown }>
+  created_at: string
 }
