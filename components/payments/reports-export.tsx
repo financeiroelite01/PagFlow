@@ -26,7 +26,7 @@ export function ReportsExport({ companies }: ReportsPageProps) {
   const [preview, setPreview] = useState<Payment[]>([])
   const [searched, setSearched] = useState(false)
   const [filters, setFilters] = useState<PaymentFilters & { status?: string }>({
-    search: '', company_id: '', category: '', date_from: '', date_to: '', status: ''
+    search: '', company_id: '', recipient: '', category: '', date_from: '', date_to: '', status: ''
   })
 
   const fetchData = useCallback(async () => {
@@ -51,6 +51,9 @@ export function ReportsExport({ companies }: ReportsPageProps) {
         )
       }
       if (filters.company_id) filtered = filtered.filter(p => p.company_id === filters.company_id)
+      if ((filters as any).recipient) filtered = filtered.filter(p => 
+        p.recipient?.toLowerCase().includes((filters as any).recipient.toLowerCase())
+      )
       if (filters.category) filtered = filtered.filter(p => p.category === filters.category)
       if (filters.status) filtered = filtered.filter(p => p.status === filters.status)
       if (filters.date_from) filtered = filtered.filter(p => p.due_date >= filters.date_from!)
@@ -72,6 +75,7 @@ export function ReportsExport({ companies }: ReportsPageProps) {
       'Descrição': p.description,
       'Valor': p.value,
       'Empresa Pagante': (p as any).company?.name || '-',
+      'Empresa Credora': p.recipient || '-',
       'Categoria': p.category || '-',
       'Status': STATUS_LABELS[p.status || 'pending'] || '-',
       'Observações': p.notes || '-',
@@ -99,7 +103,7 @@ export function ReportsExport({ companies }: ReportsPageProps) {
   }
 
   const clearFilters = () => {
-    setFilters({ search: '', company_id: '', category: '', date_from: '', date_to: '', status: '' })
+    setFilters({ search: '', company_id: '', recipient: '', category: '', date_from: '', date_to: '', status: '' } as any)
     setPreview([])
     setSearched(false)
   }
@@ -121,9 +125,16 @@ export function ReportsExport({ companies }: ReportsPageProps) {
 
           <select className="rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
             value={filters.company_id} onChange={e => setFilters(p => ({ ...p, company_id: e.target.value }))}>
-            <option value="">Todas empresas</option>
+            <option value="">Empresa Pagante</option>
             {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
+
+          <input
+            className="rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder:text-slate-400"
+            placeholder="Empresa Credora (beneficiário)"
+            value={(filters as any).recipient || ''}
+            onChange={e => setFilters(p => ({ ...p, recipient: e.target.value } as any))}
+          />
 
           <select className="rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
             value={filters.status} onChange={e => setFilters(p => ({ ...p, status: e.target.value }))}>
