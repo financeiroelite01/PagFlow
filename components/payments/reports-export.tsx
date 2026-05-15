@@ -116,26 +116,26 @@ export function ReportsExport({ companies }: ReportsPageProps) {
       {/* Filter card */}
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
         <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-4">Filtrar Relatório</h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+
+        {/* Row 1: Busca + Empresa Pagante + Empresa Credora */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input className="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-900 dark:text-slate-100 placeholder:text-slate-400"
               placeholder="Buscar..." value={filters.search} onChange={e => setFilters(p => ({ ...p, search: e.target.value }))} />
           </div>
-
           <select className="rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
             value={filters.company_id} onChange={e => setFilters(p => ({ ...p, company_id: e.target.value }))}>
             <option value="">Empresa Pagante</option>
             {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
+          <input className="rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder:text-slate-400"
+            placeholder="Empresa Credora (beneficiário)" value={filters.recipient || ''}
+            onChange={e => setFilters(p => ({ ...p, recipient: e.target.value }))} />
+        </div>
 
-          <input
-            className="rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder:text-slate-400"
-            placeholder="Empresa Credora (beneficiário)"
-            value={filters.recipient || ''}
-            onChange={e => setFilters(p => ({ ...p, recipient: e.target.value }))}
-          />
-
+        {/* Row 2: Status + Categoria + Período */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <select className="rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
             value={filters.status} onChange={e => setFilters(p => ({ ...p, status: e.target.value }))}>
             <option value="">Todos os status</option>
@@ -143,17 +143,15 @@ export function ReportsExport({ companies }: ReportsPageProps) {
             <option value="paid">Pagos</option>
             <option value="overdue">Atrasados</option>
           </select>
-
           <select className="rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
             value={filters.category} onChange={e => setFilters(p => ({ ...p, category: e.target.value }))}>
             <option value="">Categorias</option>
             {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
-
           <div className="flex gap-2 items-center">
             <input type="date" className="flex-1 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
               value={filters.date_from} onChange={e => setFilters(p => ({ ...p, date_from: e.target.value }))} />
-            <span className="text-slate-400 text-xs">até</span>
+            <span className="text-slate-400 text-xs flex-shrink-0">até</span>
             <input type="date" className="flex-1 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
               value={filters.date_to} onChange={e => setFilters(p => ({ ...p, date_to: e.target.value }))} />
           </div>
