@@ -42,16 +42,20 @@ export function CompanyReport({ companies }: CompanyReportProps) {
     const { data } = await supabase
       .from('payments')
       .select('*, company:companies(id, name, cnpj)')
-      .gte('due_date', prevFrom)
-      .lte('due_date', to)
 
     const payments = (data || []).map(p => ({
       ...p,
       status: getPaymentStatus(p.due_date, p.paid_at),
     }))
 
-    const current = payments.filter(p => p.due_date >= from && p.due_date <= to)
-    const previous = payments.filter(p => p.due_date >= prevFrom && p.due_date <= prevTo)
+    // Apenas pagamentos PAGOS no mês selecionado (pela data de pagamento)
+    const current = payments.filter(p =>
+      p.payment_date && p.payment_date >= from && p.payment_date <= to
+    )
+    // Mês anterior para comparativo
+    const previous = payments.filter(p =>
+      p.payment_date && p.payment_date >= prevFrom && p.payment_date <= prevTo
+    )
 
     const result: CompanySummary[] = companies.map(company => {
       const cp = current.filter(p => p.company_id === company.id)
@@ -114,9 +118,9 @@ export function CompanyReport({ companies }: CompanyReportProps) {
             <p className="text-sm text-slate-400 text-center py-8">Nenhum dado encontrado para este mês</p>
           ) : (
             <div className="space-y-3">
-              <p className="text-xs text-slate-400">
-                Comparativo: <span className="font-medium text-slate-600 dark:text-slate-300 capitalize">{monthLabel}</span> vs <span className="capitalize">{prevLabel}</span>
-              </p>
+      <p className="text-xs text-slate-400">
+        Contas <span className="text-emerald-500 font-medium">pagas</span> em <span className="font-medium text-slate-600 dark:text-slate-300 capitalize">{monthLabel}</span> vs <span className="capitalize">{prevLabel}</span>
+      </p>
               {summaries.map(s => {
                 const diff = s.prevTotal > 0 ? ((s.total - s.prevTotal) / s.prevTotal) * 100 : null
                 return (
