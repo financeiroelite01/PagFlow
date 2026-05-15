@@ -36,6 +36,7 @@ export interface Payment {
 export interface PaymentFilters {
   search?: string
   company_id?: string
+  recipient?: string
   category?: string
   date_from?: string
   date_to?: string
