@@ -29,16 +29,19 @@ export function Sidebar() {
   const supabase = createClient()
 
   useEffect(() => {
-    setIsDark(!document.documentElement.classList.contains('light') && 
-      document.documentElement.classList.contains('dark') || 
-      localStorage.getItem('pagflow-theme') !== 'light')
+    setIsDark(document.documentElement.classList.contains('dark'))
   }, [])
 
   const toggleTheme = () => {
     const newDark = !isDark
     setIsDark(newDark)
-    document.documentElement.classList.toggle('dark', newDark)
-    localStorage.setItem('pagflow-theme', newDark ? 'dark' : 'light')
+    if (newDark) {
+      document.documentElement.classList.add('dark')
+      localStorage.setItem('pagflow-theme', 'dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+      localStorage.setItem('pagflow-theme', 'light')
+    }
   }
 
   useEffect(() => {
