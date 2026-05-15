@@ -8,7 +8,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR" className="dark">
+    <html lang="pt-BR" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: `document.documentElement.classList.add(localStorage.getItem('pagflow-theme')==='light'?'light':'dark')` }} />
+      </head>
       <body className="antialiased bg-white dark:bg-slate-950">
         {children}
       </body>
