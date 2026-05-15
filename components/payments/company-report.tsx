@@ -31,7 +31,7 @@ export function CompanyReport({ companies }: CompanyReportProps) {
 
   const handleGenerate = async () => {
     setLoading(true)
-    const selectedDate = new Date(month + '-01')
+    const selectedDate = new Date(`${month}-15`) // dia 15 evita problema de timezone
     const from = startOfMonth(selectedDate).toISOString().split('T')[0]
     const to = endOfMonth(selectedDate).toISOString().split('T')[0]
 
