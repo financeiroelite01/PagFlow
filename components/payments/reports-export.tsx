@@ -51,8 +51,8 @@ export function ReportsExport({ companies }: ReportsPageProps) {
         )
       }
       if (filters.company_id) filtered = filtered.filter(p => p.company_id === filters.company_id)
-      if ((filters as any).recipient) filtered = filtered.filter(p => 
-        p.recipient?.toLowerCase().includes((filters as any).recipient.toLowerCase())
+      if (filters.recipient) filtered = filtered.filter(p =>
+        p.recipient?.toLowerCase().includes(filters.recipient!.toLowerCase())
       )
       if (filters.category) filtered = filtered.filter(p => p.category === filters.category)
       if (filters.status) filtered = filtered.filter(p => p.status === filters.status)
@@ -103,7 +103,7 @@ export function ReportsExport({ companies }: ReportsPageProps) {
   }
 
   const clearFilters = () => {
-    setFilters({ search: '', company_id: '', recipient: '', category: '', date_from: '', date_to: '', status: '' } as any)
+    setFilters({ search: '', company_id: '', recipient: '', category: '', date_from: '', date_to: '', status: '' })
     setPreview([])
     setSearched(false)
   }
@@ -132,8 +132,8 @@ export function ReportsExport({ companies }: ReportsPageProps) {
           <input
             className="rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder:text-slate-400"
             placeholder="Empresa Credora (beneficiário)"
-            value={(filters as any).recipient || ''}
-            onChange={e => setFilters(p => ({ ...p, recipient: e.target.value } as any))}
+            value={filters.recipient || ''}
+            onChange={e => setFilters(p => ({ ...p, recipient: e.target.value }))}
           />
 
           <select className="rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
