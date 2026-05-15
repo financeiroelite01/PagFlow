@@ -10,7 +10,8 @@ import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Modal } from '@/components/ui/modal'
 import { PaymentForm } from '@/components/payments/payment-form'
-import { Pencil, Trash2, Plus, Search, X, ChevronDown, ChevronUp, FileText, Receipt, Landmark } from 'lucide-react'
+import { PaymentAuditModal } from '@/components/payments/payment-audit-modal'
+import { Pencil, Trash2, Plus, Search, X, ChevronDown, ChevronUp, FileText, Receipt, Landmark, History } from 'lucide-react'
 
 interface PaymentsTableProps {
   tab: 'all' | PaymentStatus
@@ -24,6 +25,7 @@ export function PaymentsTable({ tab, companies }: PaymentsTableProps) {
   const [editPayment, setEditPayment] = useState<Payment | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
+  const [auditPayment, setAuditPayment] = useState<Payment | null>(null)
   const [sort, setSort] = useState<{ field: string; dir: 'asc' | 'desc' }>({ field: 'due_date', dir: 'asc' })
   const [page, setPage] = useState(1)
   const PAGE_SIZE = 15
@@ -239,18 +241,16 @@ export function PaymentsTable({ tab, companies }: PaymentsTableProps) {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => setEditPayment(p)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all"
-                          title="Corrigir"
-                        >
+                        <button onClick={() => setEditPayment(p)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all" title="Corrigir">
                           <Pencil className="w-4 h-4" />
                         </button>
-                        <button
-                          onClick={() => setDeleteId(p.id)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
-                          title="Excluir"
-                        >
+                        <button onClick={() => setAuditPayment(p)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all" title="Histórico">
+                          <History className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => setDeleteId(p.id)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all" title="Excluir">
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
@@ -320,6 +320,16 @@ export function PaymentsTable({ tab, companies }: PaymentsTableProps) {
           <PaymentForm payment={editPayment} companies={companies} onSuccess={() => { setEditPayment(null); loadPayments() }} onCancel={() => setEditPayment(null)} />
         )}
       </Modal>
+
+      {/* Audit Modal */}
+      {auditPayment && (
+        <PaymentAuditModal
+          paymentId={auditPayment.id}
+          paymentDesc={auditPayment.description}
+          open={!!auditPayment}
+          onClose={() => setAuditPayment(null)}
+        />
+      )}
 
       {/* Delete Confirm Modal */}
       <Modal open={!!deleteId} onClose={() => setDeleteId(null)} title="Excluir Pagamento" size="sm">
