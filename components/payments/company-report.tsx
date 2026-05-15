@@ -2,11 +2,12 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Company, Payment } from '@/lib/types'
-import { getPaymentStatus, formatCurrency, formatDate } from '@/lib/utils'
-import { Building2, TrendingUp, TrendingDown, Minus } from 'lucide-react'
-import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns'
+import { Company } from '@/lib/types'
+import { getPaymentStatus, formatCurrency } from '@/lib/utils'
+import { Building2, TrendingUp, TrendingDown, Minus, Download, FileText } from 'lucide-react'
+import { format, subMonths, startOfMonth, endOfMonth, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import * as XLSX from 'xlsx'
 
 interface CompanyReportProps {
   companies: Company[]
@@ -20,6 +21,23 @@ interface CompanySummary {
   overdue: number
   count: number
   prevTotal: number
+  prevPaid: number
+}
+
+// Parse yyyy-MM safely without timezone issues
+function parseMonth(ym: string) {
+  const [y, m] = ym.split('-').map(Number)
+  return new Date(y, m - 1, 1)
+}
+
+function monthRange(date: Date) {
+  const from = format(startOfMonth(date), 'yyyy-MM-dd')
+  const to = format(endOfMonth(date), 'yyyy-MM-dd')
+  return { from, to }
+}
+
+function capitalize(s: string) {
+  return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
 export function CompanyReport({ companies }: CompanyReportProps) {
@@ -28,16 +46,20 @@ export function CompanyReport({ companies }: CompanyReportProps) {
   const [summaries, setSummaries] = useState<CompanySummary[]>([])
   const [searched, setSearched] = useState(false)
   const [month, setMonth] = useState(format(new Date(), 'yyyy-MM'))
+  const [currentMonthLabel, setCurrentMonthLabel] = useState('')
+  const [prevMonthLabel, setPrevMonthLabel] = useState('')
 
   const handleGenerate = async () => {
     setLoading(true)
-    const selectedDate = new Date(`${month}-15`) // dia 15 evita problema de timezone
-    const from = startOfMonth(selectedDate).toISOString().split('T')[0]
-    const to = endOfMonth(selectedDate).toISOString().split('T')[0]
 
+    const selectedDate = parseMonth(month)
     const prevDate = subMonths(selectedDate, 1)
-    const prevFrom = startOfMonth(prevDate).toISOString().split('T')[0]
-    const prevTo = endOfMonth(prevDate).toISOString().split('T')[0]
+    const { from, to } = monthRange(selectedDate)
+    const { from: prevFrom, to: prevTo } = monthRange(prevDate)
+
+    // Fix labels using the parsed date (no timezone issue)
+    setCurrentMonthLabel(capitalize(format(selectedDate, 'MMMM yyyy', { locale: ptBR })))
+    setPrevMonthLabel(capitalize(format(prevDate, 'MMMM yyyy', { locale: ptBR })))
 
     const { data } = await supabase
       .from('payments')
@@ -48,11 +70,9 @@ export function CompanyReport({ companies }: CompanyReportProps) {
       status: getPaymentStatus(p.due_date, p.paid_at),
     }))
 
-    // Apenas pagamentos PAGOS no mês selecionado (pela data de pagamento)
     const current = payments.filter(p =>
       p.payment_date && p.payment_date >= from && p.payment_date <= to
     )
-    // Mês anterior para comparativo
     const previous = payments.filter(p =>
       p.payment_date && p.payment_date >= prevFrom && p.payment_date <= prevTo
     )
@@ -68,6 +88,7 @@ export function CompanyReport({ companies }: CompanyReportProps) {
         overdue: cp.filter(p => p.status === 'overdue').reduce((s, p) => s + p.value, 0),
         count: cp.length,
         prevTotal: pp.reduce((s, p) => s + p.value, 0),
+        prevPaid: pp.filter(p => p.status === 'paid').reduce((s, p) => s + p.value, 0),
       }
     }).filter(s => s.total > 0 || s.prevTotal > 0)
       .sort((a, b) => b.total - a.total)
@@ -77,8 +98,102 @@ export function CompanyReport({ companies }: CompanyReportProps) {
     setLoading(false)
   }
 
-  const monthLabel = format(new Date(month + '-01'), 'MMMM yyyy', { locale: ptBR })
-  const prevLabel = format(subMonths(new Date(month + '-01'), 1), 'MMMM yyyy', { locale: ptBR })
+  const exportExcel = () => {
+    if (!summaries.length) return
+    const rows = summaries.map(s => ({
+      'Empresa': s.company.name,
+      'CNPJ': s.company.cnpj || '-',
+      'Qtd Pagamentos': s.count,
+      [`Total ${currentMonthLabel}`]: s.total,
+      [`Total ${prevMonthLabel}`]: s.prevTotal,
+      'Variação (%)': s.prevTotal > 0 ? `${(((s.total - s.prevTotal) / s.prevTotal) * 100).toFixed(1)}%` : '-',
+    }))
+    // Add total row
+    rows.push({
+      'Empresa': 'TOTAL GERAL',
+      'CNPJ': '',
+      'Qtd Pagamentos': summaries.reduce((s, c) => s + c.count, 0),
+      [`Total ${currentMonthLabel}`]: summaries.reduce((s, c) => s + c.total, 0),
+      [`Total ${prevMonthLabel}`]: summaries.reduce((s, c) => s + c.prevTotal, 0),
+      'Variação (%)': '',
+    })
+    const ws = XLSX.utils.json_to_sheet(rows)
+    ws['!cols'] = [{ wch: 30 }, { wch: 18 }, { wch: 16 }, { wch: 20 }, { wch: 20 }, { wch: 14 }]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Relatório por Empresa')
+    XLSX.writeFile(wb, `relatorio-empresa-${month}.xlsx`)
+  }
+
+  const exportPDF = () => {
+    if (!summaries.length) return
+    const totalCurrent = summaries.reduce((s, c) => s + c.total, 0)
+    const totalPrev = summaries.reduce((s, c) => s + c.prevTotal, 0)
+
+    const rows = summaries.map(s => {
+      const diff = s.prevTotal > 0 ? (((s.total - s.prevTotal) / s.prevTotal) * 100).toFixed(1) : '-'
+      return `
+        <tr>
+          <td>${s.company.name}</td>
+          <td>${s.company.cnpj || '-'}</td>
+          <td style="text-align:center">${s.count}</td>
+          <td style="text-align:right">${formatCurrency(s.total)}</td>
+          <td style="text-align:right">${s.prevTotal > 0 ? formatCurrency(s.prevTotal) : '-'}</td>
+          <td style="text-align:center;color:${diff === '-' ? '#94a3b8' : Number(diff) > 0 ? '#ef4444' : '#10b981'}">${diff !== '-' ? diff + '%' : '-'}</td>
+        </tr>`
+    }).join('')
+
+    const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Relatório por Empresa — ${currentMonthLabel}</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 32px; color: #1e293b; font-size: 13px; }
+    h1 { font-size: 20px; margin-bottom: 4px; }
+    .sub { color: #64748b; margin-bottom: 24px; font-size: 12px; }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #f1f5f9; padding: 10px 12px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; border-bottom: 2px solid #e2e8f0; }
+    td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; }
+    tr:last-child td { border-bottom: none; }
+    .total-row td { font-weight: bold; background: #f8fafc; border-top: 2px solid #e2e8f0; }
+    .footer { margin-top: 24px; color: #94a3b8; font-size: 11px; text-align: right; }
+  </style>
+</head>
+<body>
+  <h1>Relatório por Empresa — PagFlow</h1>
+  <div class="sub">Contas pagas em ${currentMonthLabel} · Comparativo com ${prevMonthLabel}</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Empresa</th>
+        <th>CNPJ</th>
+        <th style="text-align:center">Qtd</th>
+        <th style="text-align:right">${currentMonthLabel}</th>
+        <th style="text-align:right">${prevMonthLabel}</th>
+        <th style="text-align:center">Variação</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows}
+      <tr class="total-row">
+        <td>TOTAL GERAL</td>
+        <td></td>
+        <td style="text-align:center">${summaries.reduce((s, c) => s + c.count, 0)}</td>
+        <td style="text-align:right">${formatCurrency(totalCurrent)}</td>
+        <td style="text-align:right">${totalPrev > 0 ? formatCurrency(totalPrev) : '-'}</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="footer">Gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</div>
+</body>
+</html>`
+
+    const blob = new Blob([html], { type: 'text/html' })
+    const url = URL.createObjectURL(blob)
+    const win = window.open(url, '_blank')
+    setTimeout(() => { win?.print(); URL.revokeObjectURL(url) }, 800)
+  }
 
   return (
     <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
@@ -88,21 +203,14 @@ export function CompanyReport({ companies }: CompanyReportProps) {
       </div>
 
       <div className="p-6 space-y-4">
-        <div className="flex gap-3 items-end">
+        <div className="flex gap-3 items-end flex-wrap">
           <div>
             <label className="text-sm font-medium text-slate-700 dark:text-slate-300 block mb-1">Mês de referência</label>
-            <input
-              type="month"
-              value={month}
-              onChange={e => setMonth(e.target.value)}
-              className="rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            />
+            <input type="month" value={month} onChange={e => setMonth(e.target.value)}
+              className="rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
-          <button
-            onClick={handleGenerate}
-            disabled={loading}
-            className="bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg text-sm transition-all flex items-center gap-2"
-          >
+          <button onClick={handleGenerate} disabled={loading}
+            className="bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg text-sm transition-all flex items-center gap-2">
             {loading ? (
               <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -111,6 +219,18 @@ export function CompanyReport({ companies }: CompanyReportProps) {
             ) : <Building2 className="w-4 h-4" />}
             Gerar
           </button>
+          {summaries.length > 0 && (
+            <>
+              <button onClick={exportExcel}
+                className="bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-medium px-4 py-2 rounded-lg text-sm transition-all flex items-center gap-2">
+                <Download className="w-4 h-4" /> Excel
+              </button>
+              <button onClick={exportPDF}
+                className="bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-medium px-4 py-2 rounded-lg text-sm transition-all flex items-center gap-2">
+                <FileText className="w-4 h-4" /> PDF
+              </button>
+            </>
+          )}
         </div>
 
         {searched && (
@@ -118,9 +238,12 @@ export function CompanyReport({ companies }: CompanyReportProps) {
             <p className="text-sm text-slate-400 text-center py-8">Nenhum dado encontrado para este mês</p>
           ) : (
             <div className="space-y-3">
-      <p className="text-xs text-slate-400">
-        Contas <span className="text-emerald-500 font-medium">pagas</span> em <span className="font-medium text-slate-600 dark:text-slate-300 capitalize">{monthLabel}</span> vs <span className="capitalize">{prevLabel}</span>
-      </p>
+              <p className="text-xs text-slate-400">
+                Contas <span className="text-emerald-500 font-medium">pagas</span> em{' '}
+                <span className="font-medium text-slate-600 dark:text-slate-300">{currentMonthLabel}</span>{' '}
+                vs <span className="text-slate-500">{prevMonthLabel}</span>
+              </p>
+
               {summaries.map(s => {
                 const diff = s.prevTotal > 0 ? ((s.total - s.prevTotal) / s.prevTotal) * 100 : null
                 return (
@@ -143,26 +266,13 @@ export function CompanyReport({ companies }: CompanyReportProps) {
                         <span className="font-bold text-slate-800 dark:text-slate-200">{formatCurrency(s.total)}</span>
                       </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[
-                        { label: 'Pagos', value: s.paid, color: 'text-emerald-500' },
-                        { label: 'A Pagar', value: s.pending, color: 'text-amber-500' },
-                        { label: 'Atrasados', value: s.overdue, color: 'text-red-500' },
-                      ].map(item => (
-                        <div key={item.label} className="text-center">
-                          <p className="text-xs text-slate-400">{item.label}</p>
-                          <p className={`text-sm font-semibold ${item.color}`}>{formatCurrency(item.value)}</p>
-                        </div>
-                      ))}
-                    </div>
                     {s.prevTotal > 0 && (
-                      <p className="text-xs text-slate-400 mt-2 text-right capitalize">Mês anterior: {formatCurrency(s.prevTotal)}</p>
+                      <p className="text-xs text-slate-400 text-right">Mês anterior: {formatCurrency(s.prevTotal)}</p>
                     )}
                   </div>
                 )
               })}
 
-              {/* Total */}
               <div className="pt-2 border-t border-slate-200 dark:border-slate-700 flex justify-between">
                 <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Total Geral</span>
                 <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{formatCurrency(summaries.reduce((s, c) => s + c.total, 0))}</span>
