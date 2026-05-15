@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { ReportsExport } from '@/components/payments/reports-export'
+import { CompanyReport } from '@/components/payments/company-report'
 
 export default async function RelatoriosPage() {
   const supabase = await createClient()
@@ -10,7 +11,7 @@ export default async function RelatoriosPage() {
       <div>
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Relatórios</h1>
         <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-          Filtre e exporte relatórios de pagamentos para Excel
+          Filtre, exporte e analise seus pagamentos
         </p>
       </div>
 
@@ -21,7 +22,11 @@ export default async function RelatoriosPage() {
         </p>
       </div>
 
+      {/* Relatório geral com exportação Excel */}
       <ReportsExport companies={companies || []} />
+
+      {/* Relatório por empresa */}
+      <CompanyReport companies={companies || []} />
     </div>
   )
 }
